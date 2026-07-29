@@ -1,0 +1,332 @@
+from psychopy import visual, core, event, gui, data
+import random
+import os
+import csv
+
+
+N_PRACTICE_TRIALS = 5          # practice trials before the real task starts
+N_BLOCKS = 4                   # total blocks (2 distraction + 2 no-distraction)
+N_TRIALS_PER_BLOCK = 20        # real trials per block
+THOUGHT_PROBES_PER_BLOCK = 3   # <-- see note above about 3 vs 6, pick one
+
+
+FIXATION_DURATION = 2.0        # seconds the "+" cross shows for
+MIN_DELAY = 2.0                # shortest possible wait before the clock moves
+MAX_DELAY = 10.0               # longest possible wait before the clock moves
+DELAY_STEP = 0.5               # delays are in these increments (2.0, 2.5, 3.0 ... 10.0)
+FEEDBACK_DURATION = 1.0        # seconds the stopped clock stays on screen
+BLANK_DURATION = 0.5           # seconds of blank grey screen between trials
+ 
+CLOCK_ROTATION_SPEED = 360.0   # degrees per second the hand sweeps (tune to taste)
+
+# Which blocks have background music/distraction playing?
+# True = distraction condition, False = silence condition.
+# This order gives you: distraction, no-distraction, distraction, no-distraction.
+# Swap this list (or randomize it) to counterbalance across participants.
+BLOCK_ORDER = [True, False, True, False]
+ 
+# The three thought-probe response options participants choose between.
+# Key '1', '2', '3' on the keyboard selects the matching option.
+THOUGHT_PROBE_OPTIONS = [
+    "1 - My mind was disengaged (blank, tired, elsewhere)",
+    "2 - I was focused on the task",
+    "3 - I was distracted by something external (sights/sounds/sensations)",
+]
+ 
+DATA_FOLDER = "data"
+
+
+# SET UP THE WINDOW AND STIMULI
+
+ 
+def get_participant_info():
+    """
+    Pops up a small dialog box asking for participant ID and which block
+    order/condition this session is. Returns a dictionary of what they typed.
+    """
+    info = {"Participant ID": "", "Session (1 or 2)": "1"}
+    dlg = gui.DlgFromDict(info, title="PVT Clock Task")
+    if not dlg.OK:
+        core.quit()  # if they hit Cancel, stop the script entirely
+    return info
+ 
+ 
+def make_window():
+    """Creates the PsychoPy window everything gets drawn into."""
+    win = visual.Window(
+        size=(1920, 1080),
+        fullscr=True,
+        color="grey",
+        units="norm",
+    )
+    win.mouseVisible = True
+    return win
+ 
+ 
+def make_stimuli(win):
+    """
+    Builds all the visual objects we'll reuse across trials, so we don't
+    recreate them every single trial (that would be slower and messier).
+    Returns them as a dictionary so we can grab whichever one we need by name.
+    """
+    fixation = visual.TextStim(win, text="+", height=0.15, color="white")
+ 
+    # The clock face: a circle outline.
+    clock_face = visual.Circle(
+        win, radius=0.3, edges=64, fillColor=None, lineColor="white", lineWidth=4
+    )
+ 
+    # The clock hand: a line from the centre pointing up (12 o'clock) at rotation 0.
+    # PsychoPy rotates shapes clockwise as `ori` increases, which is exactly
+    # what we want for a clock hand.
+    clock_hand = visual.Line(
+        win, start=(0, 0), end=(0, 0.28), lineColor="white", lineWidth=6
+    )
+ 
+    instructions = visual.TextStim(
+        win,
+        text=(
+            "Watch the clock.\n\n"
+            "As soon as the hand starts moving, click the LEFT mouse button "
+            "as fast as you can.\n\n"
+            "Click the mouse button now to begin practice."
+        ),
+        height=0.06,
+        wrapWidth=1.6,
+        color="white",
+    )
+ 
+    probe_text = visual.TextStim(
+        win,
+        text="",
+        height=0.06,
+        wrapWidth=1.6,
+        color="white",
+        pos=(0, 0.3),
+    )
+ 
+    return {
+        "fixation": fixation,
+        "clock_face": clock_face,
+        "clock_hand": clock_hand,
+        "instructions": instructions,
+        "probe_text": probe_text,
+    }
+ 
+ 
+
+# ONE TRIAL
+
+ 
+def run_one_trial(win, stim, mouse, clock_timer):
+    """
+    Runs a single PVT trial from fixation cross through to the feedback
+    screen. Returns a dictionary with the trial's data (delay used, reaction
+    time, etc.) so the main loop can save it.
+    """
+ 
+    # --- Step 1: fixation cross ---
+    stim["fixation"].draw()
+    win.flip()
+    core.wait(FIXATION_DURATION)
+ 
+    # --- Step 2: still clock, random wait before it starts moving ---
+    # random.choice picks one of the allowed 0.5s-step delay values,
+    # e.g. 2.0, 2.5, 3.0, ... 10.0 seconds.
+    possible_delays = [
+        MIN_DELAY + i * DELAY_STEP
+        for i in range(int((MAX_DELAY - MIN_DELAY) / DELAY_STEP) + 1)
+    ]
+    wait_time = random.choice(possible_delays)
+ 
+    stim["clock_hand"].ori = 0  # hand back to 12 o'clock
+    mouse.clickReset()          # clear any earlier clicks so they don't carry over
+ 
+    still_clock_timer = core.Clock()
+    while still_clock_timer.getTime() < wait_time:
+        stim["clock_face"].draw()
+        stim["clock_hand"].draw()
+        win.flip()
+        # If they click early (before the hand moves), that's a false start.
+        # We just note it and keep waiting - we don't end the trial early.
+        if mouse.getPressed()[0]:
+            pass  # you could log a "false_start = True" flag here if you want
+ 
+    # --- Step 3: clock hand starts moving, timing starts NOW ---
+    mouse.clickReset()
+    rt_clock = core.Clock()
+    clicked = False
+    rt = None
+ 
+    while not clicked:
+        elapsed = rt_clock.getTime()
+        stim["clock_hand"].ori = (elapsed * CLOCK_ROTATION_SPEED) % 360
+        stim["clock_face"].draw()
+        stim["clock_hand"].draw()
+        win.flip()
+ 
+        if mouse.getPressed()[0]:
+            rt = rt_clock.getTime()
+            clicked = True
+ 
+        # Safety cap: don't let a trial hang forever if they never click.
+        if elapsed > 5.0:
+            rt = None
+            clicked = True
+ 
+    # --- Step 4: feedback - clock stays frozen where it stopped ---
+    stim["clock_face"].draw()
+    stim["clock_hand"].draw()
+    win.flip()
+    core.wait(FEEDBACK_DURATION)
+ 
+    # --- Step 5: blank screen between trials ---
+    win.flip()  # window background color (grey) with nothing drawn on it
+    core.wait(BLANK_DURATION)
+ 
+    return {
+        "wait_time": wait_time,
+        "rt_seconds": rt,
+    }
+ 
+ 
+def run_thought_probe(win, stim):
+    """
+    Shows the three thought-probe options and waits for the participant to
+    press 1, 2, or 3 on the keyboard. Returns which one they picked.
+    """
+    probe_lines = "Please characterise your immediately preceding thoughts:\n\n"
+    probe_lines += "\n".join(THOUGHT_PROBE_OPTIONS)
+    stim["probe_text"].text = probe_lines
+    stim["probe_text"].pos = (0, 0)
+ 
+    stim["probe_text"].draw()
+    win.flip()
+ 
+    response = event.waitKeys(keyList=["1", "2", "3"])
+    return response[0]
+ 
+ 
+
+# SAVING DATA
+
+ 
+def make_data_writer(participant_id):
+    """
+    Opens a .csv file for this participant and writes the header row.
+    Returns the file handle and a csv.writer so the main loop can add rows.
+    """
+    if not os.path.exists(DATA_FOLDER):
+        os.makedirs(DATA_FOLDER)
+ 
+    filename = os.path.join(DATA_FOLDER, f"{participant_id}_pvt_clock.csv")
+    csv_file = open(filename, mode="w", newline="")
+    writer = csv.writer(csv_file)
+    writer.writerow([
+        "block_number",
+        "distraction_condition",
+        "trial_number",
+        "wait_time_seconds",
+        "rt_seconds",
+        "trial_type",       # "trial" or "thought_probe"
+        "thought_probe_response",
+    ])
+    return csv_file, writer
+ 
+
+# MAIN EXPERIMENT LOOP
+
+ 
+def main():
+    participant_info = get_participant_info()
+    participant_id = participant_info["Participant ID"] or "test"
+ 
+    win = make_window()
+    stim = make_stimuli(win)
+    mouse = event.Mouse(win=win)
+    global_clock = core.Clock()
+ 
+    csv_file, writer = make_data_writer(participant_id)
+ 
+    # --- Practice trials (not saved to the real data file) ---
+    stim["instructions"].draw()
+    win.flip()
+    event.waitKeys()  # wait for any key, or you could wait for a mouse click instead
+ 
+    for _ in range(N_PRACTICE_TRIALS):
+        run_one_trial(win, stim, mouse, global_clock)
+ 
+    # --- Real blocks ---
+    for block_index in range(N_BLOCKS):
+        is_distraction_block = BLOCK_ORDER[block_index]
+ 
+        # Pause between blocks so the experimenter can start/stop music
+        # and the participant can take a short break.
+        pause_text = visual.TextStim(
+            win,
+            text=(
+                f"Block {block_index + 1} of {N_BLOCKS}\n\n"
+                + ("(Background music will play)\n\n" if is_distraction_block
+                   else "(Silence - no music)\n\n")
+                + "Click the mouse button when you are ready to continue."
+            ),
+            height=0.06,
+            wrapWidth=1.6,
+            color="white",
+        )
+        pause_text.draw()
+        win.flip()
+        mouse.clickReset()
+        while not mouse.getPressed()[0]:
+            pass
+ 
+        # Decide in advance which trial numbers within this block will be
+        # followed by a thought probe, so they land on random (not fixed)
+        # trials, matching the paper's design.
+        probe_after_trials = set(
+            random.sample(range(N_TRIALS_PER_BLOCK), THOUGHT_PROBES_PER_BLOCK)
+        )
+ 
+        for trial_index in range(N_TRIALS_PER_BLOCK):
+            trial_data = run_one_trial(win, stim, mouse, global_clock)
+ 
+            writer.writerow([
+                block_index + 1,
+                is_distraction_block,
+                trial_index + 1,
+                trial_data["wait_time"],
+                trial_data["rt_seconds"],
+                "trial",
+                "",
+            ])
+ 
+            if trial_index in probe_after_trials:
+                probe_response = run_thought_probe(win, stim)
+                writer.writerow([
+                    block_index + 1,
+                    is_distraction_block,
+                    trial_index + 1,
+                    "",
+                    "",
+                    "thought_probe",
+                    probe_response,
+                ])
+ 
+    csv_file.close()
+ 
+    # --- Goodbye screen ---
+    goodbye = visual.TextStim(
+        win, text="Thank you - this part of the study is complete.",
+        height=0.07, color="white",
+    )
+    goodbye.draw()
+    win.flip()
+    core.wait(2.0)
+ 
+    win.close()
+    core.quit()
+ 
+ 
+if __name__ == "__main__":
+    main()
+ 
