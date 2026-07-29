@@ -6,7 +6,7 @@ import csv
 
 N_PRACTICE_TRIALS = 5          # practice trials before the real task starts
 N_BLOCKS = 4                   # total blocks (2 distraction + 2 no-distraction)
-N_TRIALS_PER_BLOCK = 20        # real trials per block
+N_TRIALS_PER_BLOCK = 34        # ~34 trials/block -> ~20 min total task time (per team review)
 THOUGHT_PROBES_PER_BLOCK = 3   # <-- see note above about 3 vs 6, pick one
 
 
@@ -141,16 +141,17 @@ def run_one_trial(win, stim, mouse, clock_timer):
  
     stim["clock_hand"].ori = 0  # hand back to 12 o'clock
     mouse.clickReset()          # clear any earlier clicks so they don't carry over
- 
-    still_clock_timer = core.Clock()
+
+    false_start_count = 0
+
+     still_clock_timer = core.Clock()
     while still_clock_timer.getTime() < wait_time:
         stim["clock_face"].draw()
         stim["clock_hand"].draw()
         win.flip()
-        # If they click early (before the hand moves), that's a false start.
-        # We just note it and keep waiting - we don't end the trial early.
         if mouse.getPressed()[0]:
-            pass  # you could log a "false_start = True" flag here if you want
+            false_start_count += 1
+            mouse.clickReset()  # clear it so the same click isn't counted repeatedly
  
     # --- Step 3: clock hand starts moving, timing starts NOW ---
     mouse.clickReset()
@@ -187,6 +188,7 @@ def run_one_trial(win, stim, mouse, clock_timer):
     return {
         "wait_time": wait_time,
         "rt_seconds": rt,
+        "false_start_count": false_start_count,
     }
  
  
@@ -228,6 +230,7 @@ def make_data_writer(participant_id):
         "trial_number",
         "wait_time_seconds",
         "rt_seconds",
+        "false_start_count",
         "trial_type",       # "trial" or "thought_probe"
         "thought_probe_response",
     ])
@@ -308,6 +311,7 @@ def main():
                     trial_index + 1,
                     "",
                     "",
+                    "",
                     "thought_probe",
                     probe_response,
                 ])
@@ -330,3 +334,29 @@ def main():
 if __name__ == "__main__":
     main()
  
+
+
+"""
+ 
+WHAT THIS SCRIPT DOES (plain English):
+This runs a "psychomotor vigilance task" (PVT) using a clock instead of the
+usual digital counter. Here's the flow for ONE trial:
+ 
+    1. A "+" fixation cross shows (currently 2 seconds - flagged by the team
+       as possibly too long; see the FIXATION_DURATION note below).
+    2. A clock face appears with the hand pointing straight up (12 o'clock).
+       Nothing moves for a random amount of time - this is what makes the
+       task unpredictable. The team agreed the original 2-10s range should
+       be shortened; see the MIN_DELAY/MAX_DELAY note below for where that
+       stands.
+    3. The clock hand starts sweeping clockwise. The participant must click
+       the LEFT mouse button as fast as possible once they see it move.
+       If they click before the hand moves, that's logged as a false start
+       (see the false_start_count field in the saved data).
+    4. The clock freezes on screen for 1 second (this is "feedback" - it
+       lets them see where they stopped it).
+    5. A blank grey screen shows for 0.5 seconds.
+    6. Either the next trial starts, OR a "thought probe" question appears
+       asking the participant what they were just thinking about. 
+
+"""
