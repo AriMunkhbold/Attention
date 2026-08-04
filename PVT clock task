@@ -338,7 +338,7 @@ if __name__ == "__main__":
 
 """
  
-WHAT THIS SCRIPT DOES (plain English):
+WHAT THIS SCRIPT DOES:
 This runs a "psychomotor vigilance task" (PVT) using a clock instead of the
 usual digital counter. Here's the flow for ONE trial:
  
