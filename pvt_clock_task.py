@@ -272,7 +272,7 @@ def run_thought_probe(win, stim):
     response = event.waitKeys(keyList=["1", "2", "3"])
     return response[0]
  
- def run_timed_break(win, stim, mouse, block_number, is_distraction_block):
+def run_timed_break(win, stim, mouse, block_number, is_distraction_block):
     """
     Runs the mandatory break before a block starts: first a fixed-length
     countdown the participant can't skip (BREAK_DURATION_SECONDS), then a
