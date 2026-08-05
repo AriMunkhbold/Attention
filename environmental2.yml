@@ -1,0 +1,9 @@
+name: psyexp
+channels:
+  - conda-forge
+dependencies:
+  - psychopy
+  - numpy
+  - pandas
+  - setuptools 69.5.1
+  - pyglet 1.5.27
