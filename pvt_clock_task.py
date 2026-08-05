@@ -18,16 +18,18 @@ DELAY_STEP = 0.5               # delays are in these increments (2.0, 2.5, 3.0 .
 FEEDBACK_DURATION = 1.0        # seconds the stopped clock stays on screen
 BLANK_DURATION = 0.5           # seconds of blank grey screen between trials
  
+# 30 seconds is a placeholder default, change this one number once the team decides on the real break length.
+BREAK_DURATION_SECONDS = 30
 CLOCK_ROTATION_SPEED = 360.0   # degrees per second the hand sweeps (tune to taste)
 
-# Which blocks have background music/distraction playing?
-# True = distraction condition, False = silence condition.
-# This order gives you: distraction, no-distraction, distraction, no-distraction.
-# Swap this list (or randomize it) to counterbalance across participants.
-BLOCK_ORDER = [True, False, True, False]
+# NOTE: block order (which blocks have music vs. silence) is no longer a
+# fixed constant here - it's chosen per participant via the "Session"
+# field in the startup dialog, so the team can alternate 1/2/1/2 across
+# participants and actually get counterbalancing. See get_block_order().
  
 # The three thought-probe response options participants choose between.
 # Key '1', '2', '3' on the keyboard selects the matching option.
+
 THOUGHT_PROBE_OPTIONS = [
     "1 - My mind was disengaged (blank, tired, elsewhere)",
     "2 - I was focused on the task",
@@ -41,9 +43,12 @@ DATA_FOLDER = "data"
 
  
 def get_participant_info():
-    """
-    Pops up a small dialog box asking for participant ID and which block
-    order/condition this session is. Returns a dictionary of what they typed.
+       """
+    Pops up a small dialog box asking for the participant ID and which
+    counterbalancing "Session" this run should use. The Session value
+    controls which condition (music or silence) this participant does
+    first - see get_block_order() below for exactly how. Returns a
+    dictionary of what the experimenter typed.
     """
     info = {"Participant ID": "", "Session (1 or 2)": "1"}
     dlg = gui.DlgFromDict(info, title="PVT Clock Task")
@@ -51,7 +56,24 @@ def get_participant_info():
         core.quit()  # if they hit Cancel, stop the script entirely
     return info
  
+def get_block_order(session_value):
+    """
+    Turns the "Session" value the experimenter typed into an actual block
+    order, so counterbalancing is a real per-participant choice instead of
+    a constant buried in the settings.
  
+    Session 1 -> distraction, silence, distraction, silence
+    Session 2 -> silence, distraction, silence, distraction
+    Anything else typed by mistake falls back to Session 1's order, rather
+    than crashing the script.
+ 
+    Run consecutive participants as 1, 2, 1, 2, ... and the two orders end
+    up used equally often, which is what counterbalancing means in practice.
+    """
+    if session_value.strip() == "2":
+        return [False, True, False, True]
+    return [True, False, True, False]
+
 def make_window():
     """Creates the PsychoPy window everything gets drawn into."""
     win = visual.Window(
@@ -106,15 +128,56 @@ def make_stimuli(win):
         pos=(0, 0.3),
     )
  
+    break_text = visual.TextStim(
+        win,
+        text="",
+        height=0.06,
+        wrapWidth=1.6,
+        color="white",
+    )
+    
+ 
     return {
         "fixation": fixation,
         "clock_face": clock_face,
         "clock_hand": clock_hand,
         "instructions": instructions,
         "probe_text": probe_text,
+        "break_text": break_text,
+     
     }
  
+# WAITING FOR A MOUSE CLICK (without freezing the window)
  
+def wait_for_mouse_click(win, mouse, draw_each_frame=None):
+    """
+    Waits for a left mouse click, redrawing the screen every frame while
+    it waits.
+ 
+    Why this function exists (this is a real fix, not just style): a loop
+    like `while not mouse.getPressed()[0]: pass` never calls win.flip(),
+    and PsychoPy processes window/input events during flip() calls. Without
+    that, the window can appear to freeze or stop responding to clicks -
+    this is exactly what was happening on the old "click to continue"
+    screens. Calling win.flip() every frame here keeps the window
+    responsive the whole time it's waiting.
+ 
+    draw_each_frame: an optional stimulus, or list of stimuli, to redraw
+    every frame while waiting (e.g. instructions text) so it stays on
+    screen instead of disappearing after the first flip.
+    """
+    mouse.clickReset()
+    stims_to_draw = []
+    if draw_each_frame is not None:
+        stims_to_draw = draw_each_frame if isinstance(draw_each_frame, list) else [draw_each_frame]
+ 
+    clicked = False
+    while not clicked:
+        for stim_item in stims_to_draw:
+            stim_item.draw()
+        win.flip()
+        if mouse.getPressed()[0]:
+            clicked = True 
 
 # ONE TRIAL
 
@@ -209,7 +272,34 @@ def run_thought_probe(win, stim):
     response = event.waitKeys(keyList=["1", "2", "3"])
     return response[0]
  
+ def run_timed_break(win, stim, mouse, block_number, is_distraction_block):
+    """
+    Runs the mandatory break before a block starts: first a fixed-length
+    countdown the participant can't skip (BREAK_DURATION_SECONDS), then a
+    "click when ready" screen so the experimenter can start or stop the
+    music before the block actually begins.
  
+    Splitting it into two parts like this guarantees everyone gets the same
+    minimum rest, while still letting the experimenter control exactly when
+    the block's audio starts.
+    """
+    break_clock = core.Clock()
+    while break_clock.getTime() < BREAK_DURATION_SECONDS:
+        remaining = max(0, int(BREAK_DURATION_SECONDS - break_clock.getTime()))
+        stim["break_text"].text = (
+            f"Take a short break.\n\n"
+            f"Block {block_number} of {N_BLOCKS} starts in {remaining} seconds..."
+        )
+        stim["break_text"].draw()
+        win.flip()
+ 
+    stim["break_text"].text = (
+        f"Block {block_number} of {N_BLOCKS}\n\n"
+        + ("(Background music will play)\n\n" if is_distraction_block
+           else "(Silence - no music)\n\n")
+        + "Click the mouse button when you are ready to continue."
+    )
+    wait_for_mouse_click(win, mouse, draw_each_frame=stim["break_text"])
 
 # SAVING DATA
 
@@ -235,7 +325,18 @@ def make_data_writer(participant_id):
         "trial_type",       # "trial" or "thought_probe"
         "thought_probe_response",
     ])
+    csv_file.flush()
     return csv_file, writer
+
+def write_data_row(csv_file, writer, row):
+    """
+    Writes one row and immediately flushes it to disk. Flushing after every
+    row (instead of only when the file is closed) means that if the script
+    crashes or PsychoPy is force-quit mid-session, whatever's been collected
+    so far is still safely on disk rather than lost with the unclosed file.
+    """
+    writer.writerow(row)
+    csv_file.flush()
  
 
 # MAIN EXPERIMENT LOOP
@@ -244,92 +345,80 @@ def make_data_writer(participant_id):
 def main():
     participant_info = get_participant_info()
     participant_id = participant_info["Participant ID"] or "test"
+    block_order = get_block_order(participant_info["Session (1 or 2)"])
  
     win = make_window()
     stim = make_stimuli(win)
     mouse = event.Mouse(win=win)
-    global_clock = core.Clock()
+ 
  
     csv_file, writer = make_data_writer(participant_id)
  
-    # --- Practice trials (not saved to the real data file) ---
-    stim["instructions"].draw()
-    win.flip()
-    event.waitKeys()  # wait for any key, or you could wait for a mouse click instead
+ try:
+        # --- Practice trials (not saved to the real data file) ---
+        # Uses wait_for_mouse_click so this actually waits for a mouse
+        # click, matching what the on-screen instructions say. (The
+        # previous version of this screen said "click the mouse" but the
+        # code was actually waiting for a keyboard press instead - fixed.)
+        wait_for_mouse_click(win, mouse, draw_each_frame=stim["instructions"])
  
-    for _ in range(N_PRACTICE_TRIALS):
-        run_one_trial(win, stim, mouse, global_clock)
+        for _ in range(N_PRACTICE_TRIALS):
+            run_one_trial(win, stim, mouse)
  
-    # --- Real blocks ---
-    for block_index in range(N_BLOCKS):
-        is_distraction_block = BLOCK_ORDER[block_index]
+        # --- Real blocks ---
+        for block_index in range(N_BLOCKS):
+            is_distraction_block = block_order[block_index]
  
-        # Pause between blocks so the experimenter can start/stop music
-        # and the participant can take a short break.
-        pause_text = visual.TextStim(
-            win,
-            text=(
-                f"Block {block_index + 1} of {N_BLOCKS}\n\n"
-                + ("(Background music will play)\n\n" if is_distraction_block
-                   else "(Silence - no music)\n\n")
-                + "Click the mouse button when you are ready to continue."
-            ),
-            height=0.06,
-            wrapWidth=1.6,
-            color="white",
-        )
-        pause_text.draw()
-        win.flip()
-        mouse.clickReset()
-        while not mouse.getPressed()[0]:
-            pass
+            # Mandatory timed break, then click-to-continue so the
+            # experimenter can start/stop the music before the block begins.
+            run_timed_break(win, stim, mouse, block_index + 1, is_distraction_block)
  
-        # Decide in advance which trial numbers within this block will be
-        # followed by a thought probe, so they land on random (not fixed)
-        # trials, matching the paper's design.
-        probe_after_trials = set(
-            random.sample(range(N_TRIALS_PER_BLOCK), THOUGHT_PROBES_PER_BLOCK)
-        )
+            # Decide in advance which trial numbers within this block will
+            # be followed by a thought probe, so they land on random (not
+            # fixed) trials, matching the paper's design.
+            probe_after_trials = set(
+                random.sample(range(N_TRIALS_PER_BLOCK), THOUGHT_PROBES_PER_BLOCK)
+            )
  
-        for trial_index in range(N_TRIALS_PER_BLOCK):
-            trial_data = run_one_trial(win, stim, mouse, global_clock)
+            for trial_index in range(N_TRIALS_PER_BLOCK):
+                trial_data = run_one_trial(win, stim, mouse)
  
-            writer.writerow([
-                block_index + 1,
-                is_distraction_block,
-                trial_index + 1,
-                trial_data["wait_time"],
-                trial_data["rt_seconds"],
-                "trial",
-                "",
-            ])
- 
-            if trial_index in probe_after_trials:
-                probe_response = run_thought_probe(win, stim)
-                writer.writerow([
+                write_data_row(csv_file, writer, [
                     block_index + 1,
                     is_distraction_block,
                     trial_index + 1,
+                    trial_data["wait_time"],
+                    trial_data["rt_seconds"],
+                    trial_data["false_start_count"],
+                    "trial",
                     "",
-                    "",
-                    "",
-                    "thought_probe",
-                    probe_response,
                 ])
  
-    csv_file.close()
+                if trial_index in probe_after_trials:
+                    probe_response = run_thought_probe(win, stim)
+                    write_data_row(csv_file, writer, [
+                        block_index + 1,
+                        is_distraction_block,
+                        trial_index + 1,
+                        "",
+                        "",
+                        "",
+                        "thought_probe",
+                        probe_response,
+                    ])
  
-    # --- Goodbye screen ---
-    goodbye = visual.TextStim(
-        win, text="Thank you - this part of the study is complete.",
-        height=0.07, color="white",
-    )
-    goodbye.draw()
-    win.flip()
-    core.wait(2.0)
+        # --- Goodbye screen ---
+        goodbye = visual.TextStim(
+            win, text="Thank you - this part of the study is complete.",
+            height=0.07, color="white",
+        )
+        goodbye.draw()
+        win.flip()
+        core.wait(2.0)
  
-    win.close()
-    core.quit()
+     finally:
+        csv_file.close()
+        win.close()
  
  
 if __name__ == "__main__":
@@ -358,6 +447,6 @@ usual digital counter. Here's the flow for ONE trial:
        lets them see where they stopped it).
     5. A blank grey screen shows for 0.5 seconds.
     6. Either the next trial starts, OR a "thought probe" question appears
-       asking the participant what they were just thinking about. 
+       asking the participant what they were just thinking about.
 
 """
