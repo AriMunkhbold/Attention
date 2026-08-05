@@ -1,0 +1,51 @@
+# environment.yml
+#
+# This file defines a conda environment - an isolated "house" (not the base
+# "street") containing exactly the packages this PVT task needs, all pinned
+# to versions that are known to work together.
+#
+# HOW TO USE THIS FILE (same steps for everyone on the team, on any machine):
+#
+#   1. Make sure you have Anaconda or Miniconda installed.
+#   2. Put this file in the same folder as pvt_clock_task.py (or anywhere,
+#      as long as you know the path to it).
+#   3. From a terminal, run:
+#        conda env create -f environment.yml
+#   4. Once it finishes, activate the environment:
+#        conda activate pvt-task
+#   5. Your terminal prompt should now show "(pvt-task)" instead of "(base)"
+#      - that's confirmation you're in the environment, not out on the
+#      street. Run the script from inside this environment:
+#        python pvt_clock_task.py
+#
+# If the environment already exists and you just pulled a newer version of
+# this file (e.g. someone added a package), update it instead of recreating
+# it from scratch:
+#        conda env update -f environment.yml --prune
+#
+# HOW TO ADD A NEW PACKAGE LATER:
+# Add its name under "dependencies" below (or under the "pip" section if
+# it's only available via pip, not conda), then have everyone run the
+# "conda env update" command above to stay in sync.
+
+name: pvt-task
+
+channels:
+  - conda-forge   # PsychoPy and its dependencies are kept up to date here
+  - defaults
+
+dependencies:
+  - python=3.9    # PsychoPy is most reliably tested against 3.9 as of writing
+  - psychopy      # the experiment-building library this script is written in
+  - numpy         # PsychoPy depends on this internally; listed explicitly
+                  # so the version is pinned by conda rather than left to chance
+  - pip           # needed so the "pip:" section below can install anything
+                  # conda-forge doesn't package
+
+  # A small number of PsychoPy's optional dependencies are more reliably
+  # installed via pip than conda. If the team runs into an import error for
+  # something PsychoPy needs that isn't listed above, add it here rather
+  # than installing it manually into the environment by hand - that way
+  # everyone's environment stays identical and reproducible from this file.
+  - pip:
+      - psychtoolbox  # improves timing precision for PsychoPy on some systems
