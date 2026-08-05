@@ -4,6 +4,7 @@ import os
 import csv
 
 
+
 N_PRACTICE_TRIALS = 5          # practice trials before the real task starts
 N_BLOCKS = 4                   # total blocks (2 distraction + 2 no-distraction)
 N_TRIALS_PER_BLOCK = 34        # ~34 trials/block -> ~20 min total task time (per team review)
