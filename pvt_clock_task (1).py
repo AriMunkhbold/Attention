@@ -2,33 +2,6 @@
 PVT CLOCK TASK - starter script
 ================================
 
-WHAT THIS SCRIPT DOES (plain English):
-This runs a "psychomotor vigilance task" (PVT) using a clock instead of the
-usual digital counter. Here's the flow for ONE trial:
-
-    1. A "+" fixation cross shows (currently 2 seconds - flagged by the team
-       as possibly too long; see the FIXATION_DURATION note below).
-    2. A clock face appears with the hand pointing straight up (12 o'clock).
-       Nothing moves for a random amount of time - this is what makes the
-       task unpredictable. The team agreed the original 2-10s range should
-       be shortened; see the MIN_DELAY/MAX_DELAY note below for where that
-       stands.
-    3. The clock hand starts sweeping clockwise. The participant must click
-       the LEFT mouse button as fast as possible once they see it move.
-       If they click before the hand moves, that's logged as a false start
-       (see the false_start_count field in the saved data).
-    4. The clock freezes on screen for 1 second (this is "feedback" - it
-       lets them see where they stopped it).
-    5. A blank grey screen shows for 0.5 seconds.
-    6. Either the next trial starts, OR a "thought probe" question appears
-       asking the participant what they were just thinking about.
-
-Per the team's latest review, this repeats for ~34 trials per block (about
-20 minutes of real task time total), across 4 blocks (2 with background
-music/distraction playing, 2 in silence). A mandatory timed break runs
-between each block, and the counterbalancing order (which condition comes
-first) is chosen by the experimenter at the start via the "Session" field
-in the participant dialog - see get_block_order() below for exactly how.
 
 HOW TO USE THIS FILE:
 - This is a plain Python script (not a PsychoPy Builder .psyexp file), so you
@@ -38,21 +11,6 @@ HOW TO USE THIS FILE:
   the actual trial code below that to tweak the task.
 - Data gets saved to a .csv file in a "data" folder, one row per trial.
 
-NUMBERS STILL PENDING FINAL CONFIRMATION FROM THE TEAM:
-- Thought probes per block: earlier notes gave conflicting numbers (3 vs. 6).
-  The latest team review settled on "~2-4, distributed randomly," so this is
-  set to 3 as a middle-ground default (THOUGHT_PROBES_PER_BLOCK below) -
-  change this one number once the exact count is finalized. Random placement
-  within the block is already handled for you.
-- Wait time before the clock moves, and fixation cross length: the team
-  agreed both should be shortened from the original paper's values (2-10s
-  wait, 2s fixation) but hasn't landed on exact new numbers yet. Both are
-  left at the original values below (MIN_DELAY, MAX_DELAY, FIXATION_DURATION)
-  with a comment marking them as pending - update them once the team decides.
-- Break length between blocks: set to 30 seconds below (BREAK_DURATION_SECONDS)
-  as a starting default since the team asked for timed breaks to be
-  implemented but hadn't specified a length - change this one number once
-  the team settles on how long the break should be.
 """
 
 from psychopy import visual, core, event, gui, data
@@ -61,9 +19,9 @@ import os
 import csv
 
 
-# ============================================================
+
 # SETTINGS  (change things here, not in the code below)
-# ============================================================
+
 
 N_PRACTICE_TRIALS = 5          # practice trials before the real task starts
 N_BLOCKS = 4                   # total blocks (2 distraction + 2 no-distraction)
@@ -106,9 +64,9 @@ THOUGHT_PROBE_OPTIONS = [
 DATA_FOLDER = "data"
 
 
-# ============================================================
+
 # SET UP THE WINDOW AND STIMULI
-# ============================================================
+
 
 def get_participant_info():
     """
@@ -216,9 +174,7 @@ def make_stimuli(win):
     }
 
 
-# ============================================================
 # WAITING FOR A MOUSE CLICK (without freezing the window)
-# ============================================================
 
 def wait_for_mouse_click(win, mouse, draw_each_frame=None):
     """
@@ -251,9 +207,8 @@ def wait_for_mouse_click(win, mouse, draw_each_frame=None):
             clicked = True
 
 
-# ============================================================
 # ONE TRIAL
-# ============================================================
+
 
 def run_one_trial(win, stim, mouse):
     """
@@ -379,9 +334,9 @@ def run_timed_break(win, stim, mouse, block_number, is_distraction_block):
     wait_for_mouse_click(win, mouse, draw_each_frame=stim["break_text"])
 
 
-# ============================================================
+
 # SAVING DATA
-# ============================================================
+
 
 def make_data_writer(participant_id):
     """
@@ -419,9 +374,8 @@ def write_data_row(csv_file, writer, row):
     csv_file.flush()
 
 
-# ============================================================
 # MAIN EXPERIMENT LOOP
-# ============================================================
+
 
 def main():
     participant_info = get_participant_info()
