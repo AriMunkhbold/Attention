@@ -39,7 +39,7 @@ BREAK_DURATION_SECONDS = 30    # mandatory break length between blocks
 
 CLOCK_ROTATION_SPEED = 360.0   # degrees per second the hand sweeps
 
-MUSIC_FILE_PATH = "distraction_music.wav"  # plays during distraction blocks only
+MUSIC_FILE_PATH = "eternal.mp3"  # plays during distraction blocks only
 
 # Block order (music vs. silence) comes from the "Session" field the
 # experimenter types in - see get_block_order().
