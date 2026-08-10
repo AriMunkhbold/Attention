@@ -258,32 +258,25 @@ def run_end_survey():
 
 def ask_confidence_question(checkpoint_label):
     """Show a single typed-response confidence question."""
-    question_text = "How confident are you in your answers so far?\n\nType your response and press ENTER."
+    question_text = ""Rate your confidence level in your answers so far, from 1 to 5.\n\n1 = Not at all confident\n5 = Extremely confident\n\nType a number and press ENTER.""
     instr = visual.TextStim(win, text=question_text, color="white", height=0.06, wrapWidth=1.6, pos=(0, 0.3))
-    answer_stim = visual.TextStim(win, text="", color="yellow", height=0.055, wrapWidth=1.6, pos=(0, -0.2))
+    selection_stim = visual.TextStim(win, text="", color="yellow", height=0.09, wrapWidth=1.6, pos=(0, -0.25))
 
-    answer = ""
+    selected = None
     while True:
         instr.draw()
-        answer_stim.text = answer + "|"
-        answer_stim.draw()
+        selection_stim.text = f"Selected: {selected}" if selected is not None else "Selected: (none yet)"
+        selection_stim.draw()
         win.flip()
-        keys = event.waitKeys()
-        commit = False
-        for key in keys:
-            if key == "return":
-                commit = True
-                break
-            elif key == "backspace":
-                answer = answer[:-1]
-            elif key == "space":
-                answer += " "
-            elif key == "escape":
-                win.close()
-                core.quit()
-            elif len(key) == 1:
-                answer += key
-        if commit:
+
+        keys = event.waitKeys(keyList=["1", "2", "3", "4", "5", "return", "escape"])
+        if "escape" in keys:
+            win.close()
+            core.quit()
+        key = keys[0]
+        if key in ["1", "2", "3", "4", "5"]:
+            selected = key
+        elif key == "return" and selected is not None:
             break
 
     participant_data.setdefault("confidence_responses", []).append({
@@ -311,124 +304,6 @@ def ask_confidence_question(checkpoint_label):
     fixation_buffer.draw()
     win.flip()
     core.wait(1.0)
-
-
-# --- Advanced end of survey ---
-def run_end_survey_adv():
-    survey_questions = [
-        "Which features of the shapes did you focus on to help with learning?",
-        "Which features of the sounds did you focus on to help with learning?",
-        "Were certain shape–sound pairings easier to remember than others? Why?",
-        "Did you use any specific strategies to remember the pairings?",
-        "Did you notice any patterns in the stimuli that helped you?",
-        "How confident were you in your answers during the testing section? Why?",
-        "Did your strategy change across the sections? If so, how and why?",
-        "What did you find most challenging about the task?",
-        "Did you rely more on intuition or logic when making your choices?",
-        "Did you imagine any associations (e.g., stories, categories) to help remember the pairs?",
-    ]
-
-    title = visual.TextStim(win, text="End of Experiment Survey", pos=(0, 0.65), height=0.1, bold=True)
-    qnum = visual.TextStim(win, text="", pos=(0, 0.52), height=0.06, color="#000000")
-    qtext = visual.TextStim(win, text="", pos=(0, 0.40), height=0.08, wrapWidth=1.6)
-
-    try:
-        textbox = visual.TextBox2(
-            win, text="", pos=(0, -0.2), units="norm", size=(1.6, 0.65),
-            letterHeight=0.07, editable=True, color='black',
-        )
-    except Exception as e:
-        print(f"TextBox2 failed to initialize ({e}); falling back to basic end-survey.")
-        return run_end_survey()
-
-    tb_border = visual.Rect(
-        win, units="norm", width=1.6, height=0.65, pos=(0, -0.2),
-        lineColor='white', lineWidth=2, fillColor="#C2C2C2"
-    )
-
-    def button(label, center_pos):
-        padding = (0.08, 0.035)
-        w, h = padding[0] * 2.4, padding[1] * 2.4
-        rect = visual.Rect(win, width=w, height=h, pos=center_pos, fillColor="#4C7BF1", lineColor=None, opacity=1)
-        text = visual.TextStim(win, text=label, pos=center_pos, height=0.06, color="white")
-        return rect, text
-
-    back_rect, back_text = button("Back", (-0.15, -0.65))
-    next_rect, next_text = button("Next", (0.15, -0.65))
-    finish_rect, finish_text = button("Finish", (0.15, -0.65))
-    esc_text = visual.TextStim(win, text="Press Esc to cancel", pos=(0, -0.82), height=0.06, color="white")
-
-    mouse = event.Mouse(win=win)
-    responses = ["" for _ in survey_questions]
-    idx = 0
-    nQ = len(survey_questions)
-
-    def load_q(i):
-        qnum.text = f"Question {i+1} of {nQ}"
-        qtext.text = survey_questions[i]
-        textbox.editable = False
-        textbox.setText(responses[i] or "")
-        textbox.editable = True
-
-    load_q(idx)
-
-    while True:
-        title.draw(); qnum.draw(); qtext.draw(); tb_border.draw(); textbox.draw(); esc_text.draw()
-
-        if idx > 0:
-            back_rect.draw(); back_text.draw()
-        if idx < nQ - 1:
-            next_rect.draw(); next_text.draw()
-        else:
-            finish_rect.draw(); finish_text.draw()
-
-        win.flip()
-
-        if len(textbox.text) > 480:
-            textbox.setText(textbox.text[:480])
-
-        if mouse.getPressed()[0]:
-            mpos = mouse.getPos()
-            clicked = False
-
-            if idx > 0:
-                if (abs(mpos[0] - back_rect.pos[0]) <= back_rect.width/2) and (abs(mpos[1] - back_rect.pos[1]) <= back_rect.height/2):
-                    responses[idx] = textbox.text
-                    idx -= 1
-                    load_q(idx)
-                    clicked = True
-
-            target_rect = next_rect if idx < nQ - 1 else finish_rect
-            if (abs(mpos[0] - target_rect.pos[0]) <= target_rect.width/2) and (abs(mpos[1] - target_rect.pos[1]) <= target_rect.height/2):
-                responses[idx] = textbox.text
-                if idx < nQ - 1:
-                    idx += 1
-                    load_q(idx)
-                else:
-                    break
-                clicked = True
-
-            if clicked:
-                while mouse.getPressed()[0]:
-                    win.flip()
-
-        keys = event.getKeys(modifiers=True, timeStamped=False)
-        for k in keys:
-            key, mods = k if isinstance(k, tuple) else (k, [])
-            if key == "escape":
-                textbox.editable = False
-                core.quit()
-
-    textbox.editable = False
-    try:
-        df = pd.DataFrame({"question": survey_questions, "response": responses})
-        participant_folder = get_participant_folder()
-        os.makedirs(participant_folder, exist_ok=True)
-        excel_path = os.path.join(participant_folder, "end_survey.xlsx")
-        df.to_excel(excel_path, index=False)
-        print(f"Survey responses saved to {excel_path}")
-    except Exception as e:
-        print(f"Could not save survey to Excel: {e}")
 
 
 # --- 2AFC timing constants & stimuli ---
@@ -485,7 +360,6 @@ def crossmodal_with_feedback():
         "Press '1' with your LEFT index finger if the FIRST pair is correct.\n"
         "Press '0' with your RIGHT index finger if the SECOND pair is correct.\n\n"
         "You'll get FEEDBACK after each response.\n\n"
-        "The correct pairings have been pre-assigned and are NOT based on the pairings you made previously.\n\n"
         "Please focus on learning the correct pairings.\n\n"
         "Try to respond as accurately and quickly as possible.\n\n"
         "Press SPACEBAR to begin.",
@@ -889,19 +763,36 @@ def run_pvt_task():
 
 
 # =====================================================================
-# SECTION RANDOMIZER
+# SECTION Parity 
 # =====================================================================
+
+def get_section_order_for_participant(participant_id):
+    """Even-numbered participant IDs do 2AFC first; odd-numbered IDs do PVT first.
+    Pulls the numeric portion out of the ID (e.g. 'P014' -> 14) so IDs with
+    letters/prefixes still work. Falls back to a random order if no digits
+    are found in the ID at all."""
+    digits = "".join(ch for ch in participant_id if ch.isdigit())
+    if digits == "":
+        print(f"Warning: no digits found in participant ID '{participant_id}'; using random section order.")
+        sections = [
+            ("2AFC", crossmodal_with_feedback),
+            ("PVT", run_pvt_task),
+        ]
+        random.shuffle(sections)
+        return sections
+
+    id_number = int(digits)
+    if id_number % 2 == 0:
+        return [("2AFC", crossmodal_with_feedback), ("PVT", run_pvt_task)]
+    else:
+        return [("PVT", run_pvt_task), ("2AFC", crossmodal_with_feedback)
 
 def run_experiment_sections():
     """Randomly orders the 2AFC and PVT sections, runs them in that order,
     and records which order was used."""
     global participant_data
 
-    sections = [
-        ("2AFC", crossmodal_with_feedback),
-        ("PVT", run_pvt_task),
-    ]
-    random.shuffle(sections)
+    sections = get_section_order_for_participant(participant_data["participant_id"])
 
     section_order = [name for name, _ in sections]
     participant_data["section_order"] = section_order
@@ -952,11 +843,8 @@ except Exception as e:
 mouse = event.Mouse(win=win)
 main_sounds = preload_sounds(audio_dir)
 
-# Run both sections in a randomized order
+# Run both sections in parity
 run_experiment_sections()
-
-# End survey
-run_end_survey_adv()
 
 # Final save (redundant but safe)
 save_crossmodal_with_feedback_to_excel()
