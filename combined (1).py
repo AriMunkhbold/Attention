@@ -87,6 +87,10 @@ def wait_for_mouse_click(win, mouse, draw_each_frame=None):
         for stim_item in stims_to_draw:
             stim_item.draw()
         win.flip()
+        keys = event.getKeys(keyList=["space", "escape"])
+        if "escape" in keys:
+            win.close()
+            core.quit()
         if mouse.getPressed()[0]:
             clicked = True
 
@@ -192,70 +196,6 @@ def save_unimodal_to_excel(matrix, trial_log, stimuli, duration, label, order):
     except Exception as e:
         print(f"Could not save matrix to Excel ({e}).")
 
-
-# --- End-of-experiment survey (simple version) ---
-def run_end_survey():
-    survey_questions = [
-        "Which features of the shapes did you focus on to help with learning?",
-        "Which features of the sounds did you focus on to help with learning?",
-        "Were certain shape–sound pairings easier to remember than others? Why?",
-        "Did you use any specific strategies to remember the pairings?",
-        "Did you notice any patterns in the stimuli that helped you?",
-        "How confident were you in your answers during the test section? Why?",
-        "Did your strategy change across the sections? If so, how and why?",
-        "What did you find most challenging about the task?",
-        "Did you rely more on intuition or logic when making your choices?",
-        "Did you imagine any associations (e.g., stories, categories) to help remember the pairs?",
-        "Any additional comments about how you approached the task?",
-    ]
-    responses = []
-    instr = visual.TextStim(
-        win,
-        text="End Survey\n\nType your answer and press ENTER to continue.\n(Use BACKSPACE to edit)",
-        color="lightgrey", height=0.06, wrapWidth=1.6, pos=(0, 0.7)
-    )
-    question_stim = visual.TextStim(win, text="", color="white", height=0.055, wrapWidth=1.6, pos=(0, 0.3))
-    answer_stim = visual.TextStim(win, text="", color="yellow", height=0.055, wrapWidth=1.6, pos=(0, -0.2))
-
-    for q in survey_questions:
-        answer = ""
-        question_stim.text = q
-        while True:
-            instr.draw()
-            question_stim.draw()
-            answer_stim.text = answer + "|"
-            answer_stim.draw()
-            win.flip()
-            keys = event.waitKeys()
-            commit = False
-            for key in keys:
-                if key == "return":
-                    responses.append(answer)
-                    commit = True
-                    break
-                elif key == "backspace":
-                    answer = answer[:-1]
-                elif key == "space":
-                    answer += " "
-                elif key == "escape":
-                    win.close()
-                    core.quit()
-                elif len(key) == 1:
-                    answer += key
-            if commit:
-                break
-
-    try:
-        df = pd.DataFrame({"question": survey_questions, "response": responses})
-        participant_folder = get_participant_folder()
-        os.makedirs(participant_folder, exist_ok=True)
-        excel_path = os.path.join(participant_folder, "end_survey.xlsx")
-        df.to_excel(excel_path, index=False)
-        print(f"Survey responses saved to {excel_path}")
-    except Exception as e:
-        print(f"Could not save survey to Excel: {e}")
-
-
 def ask_confidence_question(checkpoint_label):
     """Show a single typed-response confidence question."""
     question_text = "Rate your confidence level in your answers so far, from 1 to 5.\n\n1 = Not at all confident\n5 = Extremely confident\n\nType a number and press ENTER."
@@ -281,9 +221,9 @@ def ask_confidence_question(checkpoint_label):
 
     participant_data.setdefault("confidence_responses", []).append({
         "checkpoint": checkpoint_label,
-        "response": answer
+        "response": selected
     })
-    print(f"Confidence response recorded at {checkpoint_label}: {answer}")
+    print(f"Confidence response recorded at {checkpoint_label}: {selected}")
 
     # --- Transition screen ---
     if checkpoint_label == "midpoint":
@@ -294,8 +234,8 @@ def ask_confidence_question(checkpoint_label):
     transition_stim = visual.TextStim(win, text=transition_text, color="lightgrey", height=0.06, wrapWidth=1.6)
     transition_stim.draw()
     win.flip()
-    event.waitKeys(keyList=["space", "escape"])
-    if "escape" in event.getKeys(keyList=["escape"]):
+    keys = event.waitKeys(keyList=["space", "escape"])
+    if "escape" in keys:
         win.close()
         core.quit()
 
@@ -536,13 +476,6 @@ def crossmodal_with_feedback():
         traceback.print_exc()
         core.quit()
 
-
-def highlight_note(note_stim, on=True, color='red', scale=1.15):
-    w, h = note_stim.size
-    return visual.Rect(win, width=w * scale, height=h * scale, lineColor=color if on else None,
-                        lineWidth=3 if on else 0, fillColor=None, pos=note_stim.pos)
-
-
 # =====================================================================
 # #####################  PSYCHOMOTOR VIGILANCE TASK  ###################
 # =====================================================================
@@ -653,6 +586,11 @@ def run_one_pvt_trial(win, stim, mouse):
         if elapsed > 5.0:
             rt = None
             clicked = True
+        
+        keys = event.getKeys(keyList=["space", "escape"])
+        if "escape" in keys:
+            win.close()
+            core.quit()
 
     stim["clock_face"].draw()
     stim["clock_hand"].draw()
@@ -678,13 +616,18 @@ def run_pvt_thought_probe(win, stim):
     stim["probe_text"].draw()
     win.flip()
 
-    response = event.waitKeys(keyList=["1", "2", "3"])
+    response = event.waitKeys(keyList=["1", "2", "3", "escape"])
+    if "escape" in response:
+        win.close()
+        core.quit()
     return response[0]
+    
 
 
 def run_pvt_break(win, stim, mouse, music, block_number, is_distraction_block):
     if music is not None:
         music.stop()  # breaks are always silent, even going into a distraction block
+
 
     break_clock = core.Clock()
     while break_clock.getTime() < PVT_BREAK_DURATION_SECONDS:
@@ -695,6 +638,10 @@ def run_pvt_break(win, stim, mouse, music, block_number, is_distraction_block):
         )
         stim["break_text"].draw()
         win.flip()
+        keys = event.getKeys(keyList=["space", "escape"])
+        if "escape" in keys:
+            win.close()
+            core.quit()
 
     stim["break_text"].text = (
         f"Block {block_number} of {PVT_N_BLOCKS}\n\n"
@@ -727,7 +674,6 @@ def run_pvt_task():
     """The PVT section. Uses the shared `win` / `mouse`. Returns 'done'."""
     global participant_data
 
-    session_value = input("PVT Session (1 or 2, for block-order counterbalancing): ").strip() or "1"
     block_order = get_pvt_block_order(session_value)
 
     stim = make_pvt_stimuli(win)
@@ -841,6 +787,7 @@ def run_experiment_sections():
 # =====================================================================
 
 participant_id = get_participant_id()
+session_value = input("PVT Session (1 or 2, for block-order counterbalancing): ").strip() or "1"
 participant_data = {
     "participant_id": participant_id,
     "task order": "",
