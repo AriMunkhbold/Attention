@@ -480,7 +480,7 @@ def crossmodal_with_feedback():
 # #####################  PSYCHOMOTOR VIGILANCE TASK  ###################
 # =====================================================================
 
-PVT_N_PRACTICE_TRIALS = 5
+PVT_N_PRACTICE_TRIALS = 3
 PVT_N_BLOCKS = 4
 PVT_N_TRIALS_PER_BLOCK = 34
 PVT_THOUGHT_PROBES_PER_BLOCK = 3
@@ -526,10 +526,14 @@ def make_pvt_stimuli(win):
     )
     probe_text = visual.TextStim(win, text="", height=0.06, wrapWidth=1.6, color="white", pos=(0, 0.3))
     break_text = visual.TextStim(win, text="", height=0.06, wrapWidth=1.6, color="white")
-
+    progress_bar = visual.Rect(
+        win, width=0, height=0.05, pos=(0, -0.85),
+        lineColor="white", fillColor="white", autoDraw=False, name="pvt_progressbar"
+    )
     return {
         "fixation": fixation, "clock_face": clock_face, "clock_hand": clock_hand,
         "instructions": instructions, "probe_text": probe_text, "break_text": break_text,
+        "progress_bar": progress_bar,    
     }
 
 
@@ -645,7 +649,6 @@ def run_pvt_break(win, stim, mouse, music, block_number, is_distraction_block):
 
     stim["break_text"].text = (
         f"Block {block_number} of {PVT_N_BLOCKS}\n\n"
-        + ("(Background music will play)\n\n" if is_distraction_block else "(Silence - no music)\n\n")
         + "Click the mouse button when you are ready to continue."
     )
     wait_for_mouse_click(win, mouse, draw_each_frame=stim["break_text"])
@@ -681,6 +684,13 @@ def run_pvt_task():
     csv_file, writer = make_pvt_data_writer(participant_data["participant_id"])
 
     print("Starting PVT task...")
+
+    # --- progress bar geometry (matches 2AFC style) ---
+    pb_cx, pb_cy = 0, -0.85
+    pb_finalwidth = 1.4
+    pb_left = pb_cx - (pb_finalwidth / 2)
+    total_main_trials = PVT_N_BLOCKS * PVT_N_TRIALS_PER_BLOCK
+    overall_trial_counter = 0
 
     try:
         wait_for_mouse_click(win, mouse, draw_each_frame=stim["instructions"])
@@ -718,6 +728,7 @@ def run_pvt_task():
             if music is not None:
                 music.stop()
 
+        stim["progress_bar"].autoDraw = False
         goodbye = visual.TextStim(win, text="Thank you - this part of the study is complete.", height=0.07, color="white")
         goodbye.draw()
         win.flip()
