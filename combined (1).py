@@ -74,6 +74,19 @@ def show_instructions(text, key_list):
         if keys:
             return keys[0]
 
+def show_overall_welcome():
+    text = (
+        "Welcome!\n\n"
+        "This experiment has two sections.\n\n"
+        "Press SPACEBAR to begin."
+    )
+    stim = visual.TextStim(win, text=text, color="lightgrey", height=0.06, wrapWidth=1.6)
+    stim.draw()
+    win.flip()
+    keys = event.waitKeys(keyList=["space", "escape"])
+    if "escape" in keys:
+        win.close()
+        core.quit()
 
 def wait_for_mouse_click(win, mouse, draw_each_frame=None):
     """Waits for a left mouse click, redrawing the screen every frame while it waits."""
@@ -227,7 +240,7 @@ def ask_confidence_question(checkpoint_label):
 
     # --- Transition screen ---
     if checkpoint_label == "midpoint":
-        transition_text = "Thanks!\n\nYou're halfway through this section.\n\nTake a short break if you'd like.\n\nPress SPACEBAR when you're ready to continue."
+        transition_text = "Thanks!\n\nYou're halfway through this section.\n\nPress SPACEBAR when you're ready to continue."
     else:
         transition_text = "Thanks!\n\nPress SPACEBAR to continue."
 
@@ -292,6 +305,8 @@ def crossmodal_with_feedback():
     event.clearEvents()
 
     print("Starting Crossmodal with feedback (2AFC)...")
+
+    section_label = f"SECTION {section_number} of {total_sections}\n\n" if section_number else ""
 
     instruction_result = show_instructions(
         "INSTRUCTIONS – Learning Task\n\n"
@@ -366,13 +381,23 @@ def crossmodal_with_feedback():
             "interTrialPause_max": float(np.max(interTrialPause_local)),
         })
 
-        for trial_index, (img_file, audio_file, tones) in enumerate(crossmodal_trials):
+        trial_index = 0
+        n_crossmodal_trials = len(crossmodal_trials)
+        midpoint_index = 75  # halfway through 150 trials
+
+        while trial_index < n_crossmodal_trials:
+            img_file, audio_file, tones = crossmodal_trials[trial_index]
             event.clearEvents()
             if "escape" in event.getKeys(keyList=["escape"]):
                 win.close()
                 core.quit()
             if "s" in event.getKeys(keyList=["s"]):
-                return "skip"
+                if trial_index < midpoint_index:
+                    ask_confidence_question("midpoint")
+                    trial_index = midpoint_index
+                continue
+            else:
+                break
 
             trial_clock = core.Clock()
             image_path = os.path.join(image_dir, img_file)
@@ -397,19 +422,34 @@ def crossmodal_with_feedback():
             main_sounds[tones[0]].play()
             wait_and_listen(STIMULUS_DURATION, response_state, trial_clock)
             if response_state["skip"]:
-                return "skip"
+                if trial_index < midpoint_index:
+                    ask_confidence_question("midpoint")
+                    trial_index = midpoint_index
+                    continue
+                else:
+                    break
 
             fixation.pos = (0, 0)
             fixation.draw()
             win.flip()
             wait_and_listen(FIXATION_DURATION, response_state, trial_clock)
             if response_state["skip"]:
-                return "skip"
+                if trial_index < midpoint_index:
+                    ask_confidence_question("midpoint")
+                    trial_index = midpoint_index
+                    continue
+                else:
+                    break
 
             win.flip()
             wait_and_listen(interStimulusPause_local[trial_index], response_state, trial_clock)
             if response_state["skip"]:
-                return "skip"
+                if trial_index < midpoint_index:
+                    ask_confidence_question("midpoint")
+                    trial_index = midpoint_index
+                    continue
+                else:
+                    break
 
             img_stim_right.image = image_path
             img_stim_right.draw()
@@ -418,7 +458,12 @@ def crossmodal_with_feedback():
             main_sounds[tones[1]].play()
             wait_and_listen(STIMULUS_DURATION, response_state, trial_clock)
             if response_state["skip"]:
-                return "skip"
+                if trial_index < midpoint_index:
+                    ask_confidence_question("midpoint")
+                    trial_index = midpoint_index
+                    continue
+                else:
+                    break
 
             prompt_sound2.draw()
             win.flip()
@@ -426,7 +471,12 @@ def crossmodal_with_feedback():
             if response_state["response"] is None:
                 wait_and_listen(4, response_state, trial_clock)
                 if response_state["skip"]:
-                    return "skip"
+                    if trial_index < midpoint_index:
+                        ask_confidence_question("midpoint")
+                        trial_index = midpoint_index
+                        continue
+                    else:
+                        break
 
             response = response_state["response"] if response_state["response"] is not None else "NA"
             reaction_time = response_state["reaction_time"] if response_state["reaction_time"] is not None else round(trial_clock.getTime(), 3)
@@ -460,6 +510,7 @@ def crossmodal_with_feedback():
 
             if trial_index == 74:
                 ask_confidence_question("midpoint")
+            trial_index += 1
 
         progress_bar.autoDraw = False
         ask_confidence_question("end")
@@ -570,6 +621,12 @@ def run_one_pvt_trial(win, stim, mouse):
         if mouse.getPressed()[0]:
             false_start_count += 1
             mouse.clickReset()
+        keys = event.getKeys(keyList=["s", "escape"])
+        if "escape" in keys:
+            win.close()
+            core.quit()
+        if "s" in keys:
+            return {"wait_time": wait_time, "rt_seconds": None, "false_start_count": false_start_count, "skip": True}
 
     mouse.clickReset()
     rt_clock = core.Clock()
@@ -595,6 +652,8 @@ def run_one_pvt_trial(win, stim, mouse):
         if "escape" in keys:
             win.close()
             core.quit()
+        if "s" in keys:
+            return {"wait_time": wait_time, "rt_seconds": None, "false_start_count": false_start_count, "skip": True}
 
     stim["clock_face"].draw()
     stim["clock_hand"].draw()
@@ -608,6 +667,7 @@ def run_one_pvt_trial(win, stim, mouse):
         "wait_time": wait_time,
         "rt_seconds": rt,
         "false_start_count": false_start_count,
+        "skip": False,
     }
 
 
@@ -684,6 +744,7 @@ def run_pvt_task():
     csv_file, writer = make_pvt_data_writer(participant_data["participant_id"])
 
     print("Starting PVT task...")
+    section_label = f"SECTION {section_number} of {total_sections}\n\n" if section_number else ""
 
     # --- progress bar geometry (matches 2AFC style) ---
     pb_cx, pb_cy = 0, -0.85
@@ -715,8 +776,23 @@ def run_pvt_task():
                 write_pvt_data_row(csv_file, writer, [
                     block_index + 1, is_distraction_block, trial_index + 1,
                     trial_data["wait_time"], trial_data["rt_seconds"],
-                    trial_data["false_start_count"], "trial", "",
+                    trial_data["false_start_count"],
+                    "trial_skipped" if trial_data.get("skip") else "trial", "",
                 ])
+
+            # --- advance progress bar on any button press: a genuine click OR a skip ---
+            button_was_pressed = (trial_data["rt_seconds"] is not None) or trial_data.get("skip", False)
+            if button_was_pressed:
+                overall_trial_counter += 1
+                progress = overall_trial_counter / float(total_main_trials) if total_main_trials > 0 else 1.0
+                progress = min(progress, 1.0)
+                pb_width = pb_finalwidth * progress
+                stim["progress_bar"].width = pb_width
+                stim["progress_bar"].pos = (pb_left + pb_width / 2, pb_cy)
+            
+                if trial_data.get("skip"):
+                    print(f"Block {block_index + 1} skipped by user at trial {trial_index + 1}; moving to next block.")
+                    break
 
                 if trial_index in probe_after_trials:
                     probe_response = run_pvt_thought_probe(win, stim)
@@ -778,19 +854,22 @@ def run_experiment_sections():
     section_order = [name for name, _ in sections]
     participant_data["section_order"] = section_order
     print(f"Section order for this participant: {section_order}")
+    total_sections = len(sections)
 
-    for name, func in sections:
-        print(f"--- Starting section: {name} ---")
-        result = func()
+    show_overall_welcome()
+
+    for i, (name, func) in enumerate(sections):
+        section_number = i + 1
+        print(f"--- Starting section: {name} (Section {section_number} of {total_sections}) ---")
+        result = func(section_number=section_number, total_sections=total_sections)
         if result == "skip":
             print(f"{name} section skipped.")
         else:
             print(f"{name} section completed.")
-
         if name == "2AFC":
             save_crossmodal_with_feedback_to_excel()
-
     return section_order
+
 
 
 # =====================================================================
