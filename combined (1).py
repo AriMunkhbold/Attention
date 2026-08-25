@@ -296,7 +296,7 @@ def crossWF_pick_incorrect_tone(correct_tone, available_tones, current_diff, tri
     return candidate, trial_diff
 
 
-def crossmodal_with_feedback():
+def crossmodal_with_feedback(section_number=None, total_sections=None):
     """The 2AFC section. Returns 'done' or 'skip'."""
     global participant_data
     participant_data["task order"] = "active"
@@ -798,7 +798,7 @@ def write_pvt_data_row(csv_file, writer, row):
     csv_file.flush()
 
 
-def run_pvt_task():
+def run_pvt_task(section_number=None, total_sections=None):
     """The PVT section. Uses the shared `win` / `mouse`. Returns 'done'."""
     global participant_data
 
