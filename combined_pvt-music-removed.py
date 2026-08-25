@@ -396,8 +396,6 @@ def crossmodal_with_feedback(section_number=None, total_sections=None):
                     ask_confidence_question("midpoint")
                     trial_index = midpoint_index
                 continue
-            else:
-                break
 
             trial_clock = core.Clock()
             image_path = os.path.join(image_dir, img_file)
