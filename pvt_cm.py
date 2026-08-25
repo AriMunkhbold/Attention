@@ -947,6 +947,7 @@ def run_experiment_sections():
 
 participant_id = get_participant_id()
 
+core.checkPygletApp() 
 dlg = gui.Dlg(title="PVT Session")
 dlg.addField("PVT Session (1 or 2, for block-order counterbalancing):", "1")
 ok_data = dlg.show()
