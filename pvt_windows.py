@@ -28,6 +28,8 @@ import pandas as pd
 import numpy as np
 
 from psychopy import visual, core, event, sound, gui, data
+import wx
+_dlg_app = wx.App(False)  # keep alive for the whole script so multiple gui.Dlg() calls don't break
 from psychopy import logging
 logging.console.setLevel(logging.ERROR)  # suppresses certain warnings
 import warnings
@@ -949,7 +951,8 @@ def run_experiment_sections():
 
 participant_id = get_participant_id()
 
-core.checkPygletApp() 
+if hasattr(core, "checkPygletApp"):
+    core.checkPygletApp()
 dlg = gui.Dlg(title="PVT Session")
 dlg.addField("PVT Session (1 or 2, for block-order counterbalancing):", "1")
 ok_data = dlg.show()
