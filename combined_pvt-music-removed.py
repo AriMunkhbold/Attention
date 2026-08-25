@@ -697,6 +697,79 @@ def run_pvt_break(win, stim, mouse, block_number):
     )
     wait_for_mouse_click(win, mouse, draw_each_frame=stim["break_text"])
 
+PVT_FINAL_QUESTIONNAIRE_ITEMS = [
+    "I was fantasizing or daydreaming",
+    "My thoughts drifted into situations unrelated to the task",
+    "I was distracted by environmental stimuli while in task",
+    "I found my attention drawn away by something I saw, heard, noticed around me",
+    "I was worried about my score on this test",
+    "I was wondering about the result for my test",
+    "I make my thoughts wonder so the task passes faster",
+    "I make my thoughts wonder so the task is less boring",
+    "I actively use the time in routine tasks to think about other things",
+    "I was surprised that, for a few seconds, your mind was thinking about something else",
+    "I had other thoughts randomly popping into my head during the task",
+    "I realized my mind wandered for a long time without intending them to",
+]
+
+def run_pvt_final_questionnaire(win, stim):
+    """Shown once at the end of the PVT task. Returns a list of
+    {"item": ..., "response": ...} dicts, one per statement."""
+    responses = []
+
+    intro = visual.TextStim(
+        win,
+        text=(
+            "Before you finish, please answer a few questions about your\n"
+            "thoughts during the task you just completed.\n\n"
+            "For each statement, rate how much it applied to you,\n"
+            "from 1 (Not at all) to 5 (Very much).\n\n"
+            "Press SPACEBAR to begin."
+        ),
+        height=0.06, wrapWidth=1.6, color="white",
+    )
+    intro.draw()
+    win.flip()
+    keys = event.waitKeys(keyList=["space", "escape"])
+    if "escape" in keys:
+        win.close()
+        core.quit()
+
+    for i, item_text in enumerate(PVT_FINAL_QUESTIONNAIRE_ITEMS):
+        prompt = (
+            f"({i + 1} of {len(PVT_FINAL_QUESTIONNAIRE_ITEMS)})\n\n"
+            f"\"{item_text}\"\n\n"
+            "1 = Not at all        5 = Very much\n\n"
+            "Press a number key (1-5)."
+        )
+        stim["probe_text"].text = prompt
+        stim["probe_text"].pos = (0, 0)
+        stim["probe_text"].draw()
+        win.flip()
+
+        response = event.waitKeys(keyList=["1", "2", "3", "4", "5", "escape"])
+        if "escape" in response:
+            win.close()
+            core.quit()
+
+        responses.append({"item": item_text, "response": response[0]})
+
+    return responses
+
+def save_pvt_final_questionnaire_to_excel(participant_id, responses):
+    participant_folder = get_participant_folder()
+    os.makedirs(participant_folder, exist_ok=True)
+    filename = os.path.join(participant_folder, f"{participant_id}_pvt_final_questionnaire.xlsx")
+
+    df = pd.DataFrame(responses)
+    df.index = range(1, len(df) + 1)
+    df.index.name = "Item Number"
+
+    with pd.ExcelWriter(filename, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name="final_questionnaire", index=True)
+
+    print(f"PVT final questionnaire saved to {filename}")
+
 
 def make_pvt_data_writer(participant_id):
     participant_folder = get_participant_folder()
@@ -787,6 +860,10 @@ def run_pvt_task(section_number=None, total_sections=None):
                     ])
 
         stim["progress_bar"].autoDraw = False
+
+        questionnaire_response = run_pvt_final_questionnaire((win,stim)
+        save_pvt_final_questionnaire_to_excel(participant_data["participant_id"], questionnaire_response)
+        participant_data["pvt_final_questionnaire"] = questionnaire_responses
         goodbye = visual.TextStim(win, text="Thank you - this part of the study is complete.", height=0.07, color="white")
         goodbye.draw()
         win.flip()
