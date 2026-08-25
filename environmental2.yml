@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - psychopy
-  - numpy
+  - numpy<2.0
   - pandas
   - setuptools 69.5.1
   - pyglet 1.5.27
