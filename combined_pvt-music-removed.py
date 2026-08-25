@@ -662,7 +662,7 @@ def run_pvt_thought_probe(win, stim):
             f"\" {statement}\"\n\n"
             "Press a number key (1-5)."
         )
-        stim["probe_text"].text = prompt
+        stim["probe_text"].text = Prompt
         stim["probe_text"].pos = (0, 0)
         stim["probe_text"].draw()
         win.flip
