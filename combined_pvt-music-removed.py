@@ -861,7 +861,7 @@ def run_pvt_task(section_number=None, total_sections=None):
 
         stim["progress_bar"].autoDraw = False
 
-        questionnaire_response = run_pvt_final_questionnaire((win,stim)
+        questionnaire_response = run_pvt_final_questionnaire((win,stim))
         save_pvt_final_questionnaire_to_excel(participant_data["participant_id"], questionnaire_response)
         participant_data["pvt_final_questionnaire"] = questionnaire_responses
         goodbye = visual.TextStim(win, text="Thank you - this part of the study is complete.", height=0.07, color="white")
