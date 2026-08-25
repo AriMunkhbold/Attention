@@ -848,7 +848,7 @@ def run_pvt_task(section_number=None, total_sections=None):
                 if trial_data.get("skip"):
                     print(f"Block {block_index + 1} skipped by user at trial {trial_index + 1}; moving to next block.")
                     block_was_skipped = True
-                    event.clearEvent()
+                    event.clearEvents()
                     break
 
                 if trial_index in probe_after_trials:
