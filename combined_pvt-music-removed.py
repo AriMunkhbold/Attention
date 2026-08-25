@@ -663,14 +663,14 @@ def run_pvt_thought_probe(win, stim):
         stim["probe_text"].text = Prompt
         stim["probe_text"].pos = (0, 0)
         stim["probe_text"].draw()
-        win.flip
+        win.flip()
 
-        response = event.waitKeys(keyList=["1", "2", "3", "escape"])
+        response = event.waitKeys(keyList=["1", "2", "3", "4", "5", "escape"])
         if "escape" in response:
             win.close()
             core.quit()
-        ratings[statement] = response[0]
-    return response[0]
+        rating[statement] = response[0]
+    return rating
     
 
 
@@ -850,7 +850,7 @@ def run_pvt_task(section_number=None, total_sections=None):
                     break
 
                 if trial_index in probe_after_trials:
-                    probe_response = run_pvt_thought_probe(win, stim)
+                    probe_ratings = run_pvt_thought_probe(win, stim)
                     write_pvt_data_row(csv_file, writer, [
                         block_index + 1, trial_index + 1,
                         "", "", "", "thought_probe", 
