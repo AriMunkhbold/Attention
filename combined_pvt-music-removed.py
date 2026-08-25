@@ -780,7 +780,7 @@ def make_pvt_data_writer(participant_id):
     writer.writerow([
         "block_number", "trial_number", "wait_time_seconds",
         "rt_seconds", "false_start_count", "trial_type", 
-        "probe_disengaged_rating, "probe_focused_rating", "probe_distracted_rating",
+        "probe_disengaged_rating", "probe_focused_rating", "probe_distracted_rating",
     ])
     csv_file.flush()
     return csv_file, writer
