@@ -10,6 +10,7 @@
 # =====================================================================
 
 # --- Setup & imports ---
+import wx
 from psychopy import prefs  # set audio backend before importing sound
 prefs.hardware['audioLib'] = ['pygame', 'sounddevice']
 prefs.general['audioDevice'] = ['default']
@@ -947,7 +948,7 @@ def run_experiment_sections():
 
 participant_id = get_participant_id()
 
-core.checkPygletApp() 
+app = wx.App(False)
 dlg = gui.Dlg(title="PVT Session")
 dlg.addField("PVT Session (1 or 2, for block-order counterbalancing):", "1")
 ok_data = dlg.show()
