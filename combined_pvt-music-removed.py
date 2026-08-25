@@ -547,9 +547,9 @@ PVT_BREAK_DURATION_SECONDS = 30
 PVT_CLOCK_ROTATION_SPEED = 360.0
 
 PVT_THOUGHT_PROBE_OPTIONS = [
-    "1 - My mind was disengaged (blank, tired, elsewhere)",
-    "2 - I was focused on the task",
-    "3 - I was distracted by something external (sights/sounds/sensations)",
+    "My mind was disengaged (blank, tired, elsewhere)",
+    "I was focused on the task",
+    "I was distracted by something external (sights/sounds/sensations)",
 ]
 
 
@@ -654,18 +654,24 @@ def run_one_pvt_trial(win, stim, mouse):
 
 
 def run_pvt_thought_probe(win, stim):
-    probe_lines = "Please characterise your immediately preceding thoughts:\n\n"
-    probe_lines += "\n".join(PVT_THOUGHT_PROBE_OPTIONS)
-    stim["probe_text"].text = probe_lines
-    stim["probe_text"].pos = (0, 0)
+    rating = {}
+    for statement in PVT_THOUGHT_PROBE_OPTIONS:
+        Prompt = (
+            "Rate the following on a scale from 1 to 5:\n"
+            "1 = Not at all    5 = Very much\n\n"
+            f"\" {statement}\"\n\n"
+            "Press a number key (1-5)."
+        )
+        stim["probe_text"].text = prompt
+        stim["probe_text"].pos = (0, 0)
+        stim["probe_text"].draw()
+        win.flip
 
-    stim["probe_text"].draw()
-    win.flip()
-
-    response = event.waitKeys(keyList=["1", "2", "3", "escape"])
-    if "escape" in response:
-        win.close()
-        core.quit()
+        response = event.waitKeys(keyList=["1", "2", "3", "escape"])
+        if "escape" in response:
+            win.close()
+            core.quit()
+        ratings[statement] = response[0]
     return response[0]
     
 
@@ -700,7 +706,8 @@ def make_pvt_data_writer(participant_id):
     writer = csv.writer(csv_file)
     writer.writerow([
         "block_number", "trial_number", "wait_time_seconds",
-        "rt_seconds", "false_start_count", "trial_type", "thought_probe_response",
+        "rt_seconds", "false_start_count", "trial_type", 
+        "probe_disengaged_rating, "probe_focused_rating", "probe_distracted_rating",
     ])
     csv_file.flush()
     return csv_file, writer
@@ -773,7 +780,10 @@ def run_pvt_task(section_number=None, total_sections=None):
                     probe_response = run_pvt_thought_probe(win, stim)
                     write_pvt_data_row(csv_file, writer, [
                         block_index + 1, trial_index + 1,
-                        "", "", "", "thought_probe", probe_response,
+                        "", "", "", "thought_probe", 
+                        probe_ratings[PVT_THOUGHT_PROBE_OPTIONS[0]],
+                        probe_ratings[PVT_THOUGHT_PROBE_OPTIONS[1]],
+                        probe_ratings[PVT_THOUGHT_PROBE_OPTIONS[2]]
                     ])
 
         stim["progress_bar"].autoDraw = False
