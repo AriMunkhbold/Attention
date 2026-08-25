@@ -817,6 +817,7 @@ def run_pvt_task(section_number=None, total_sections=None):
 
         for block_index in range(PVT_N_BLOCKS):
             run_pvt_break(win, stim, mouse, block_index + 1)
+            event.clearEvents()
 
             probe_after_trials = set(
                 random.sample(range(PVT_N_TRIALS_PER_BLOCK), PVT_THOUGHT_PROBES_PER_BLOCK)
@@ -847,6 +848,7 @@ def run_pvt_task(section_number=None, total_sections=None):
                 if trial_data.get("skip"):
                     print(f"Block {block_index + 1} skipped by user at trial {trial_index + 1}; moving to next block.")
                     block_was_skipped = True
+                    event.clearEvent()
                     break
 
                 if trial_index in probe_after_trials:
