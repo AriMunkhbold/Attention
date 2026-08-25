@@ -546,12 +546,11 @@ PVT_BLANK_DURATION = 0.5
 PVT_BREAK_DURATION_SECONDS = 30
 PVT_CLOCK_ROTATION_SPEED = 360.0
 
-PVT_MUSIC_FILE_PATH = "eternal.mp3"  # plays during distraction blocks only
 
 PVT_THOUGHT_PROBE_OPTIONS = [
-    "1 - My mind was disengaged (blank, tired, elsewhere)",
-    "2 - I was focused on the task",
-    "3 - I was distracted by something external (sights/sounds/sensations)",
+    "My mind was disengaged (blank, tired, elsewhere)",
+    "I was focused on the task",
+    "I was distracted by something external (sights/sounds/sensations)",
 ]
 
 
@@ -586,16 +585,6 @@ def make_pvt_stimuli(win):
         "instructions": instructions, "probe_text": probe_text, "break_text": break_text,
         "progress_bar": progress_bar,    
     }
-
-
-def load_pvt_music():
-    """Loads the PVT distraction track once. Returns None (silent) if the file's missing."""
-    try:
-        return sound.Sound(PVT_MUSIC_FILE_PATH, loops=-1)
-    except Exception as error:
-        print(f"WARNING: couldn't load PVT music file '{PVT_MUSIC_FILE_PATH}' ({error}). "
-              f"Distraction blocks will run in silence.")
-        return None
 
 
 def run_one_pvt_trial(win, stim, mouse):
@@ -672,27 +661,30 @@ def run_one_pvt_trial(win, stim, mouse):
 
 
 def run_pvt_thought_probe(win, stim):
-    probe_lines = "Please characterise your immediately preceding thoughts:\n\n"
-    probe_lines += "\n".join(PVT_THOUGHT_PROBE_OPTIONS)
-    stim["probe_text"].text = probe_lines
-    stim["probe_text"].pos = (0, 0)
+    ratings = {}
+    for statement in PVT_THOUGHT_PROBE_OPTIONS:
+        prompt = (
+            "Rate the following on a scale from 1 to 5:\n"
+            "1 = Not at all    5 = Very much\n\n"
+            f"\"{statement}\"\n\n"
+            "Press a number key (1-5)."
+        )
+        stim["probe_text"].text = prompt
+        stim["probe_text"].pos = (0, 0)
+        stim["probe_text"].draw()
+        win.flip()
 
-    stim["probe_text"].draw()
-    win.flip()
+        response = event.waitKeys(keyList=["1", "2", "3", "4", "5", "escape"])
+        if "escape" in response:
+            win.close()
+            core.quit()
+        ratings[statement] = response[0]
 
-    response = event.waitKeys(keyList=["1", "2", "3", "escape"])
-    if "escape" in response:
-        win.close()
-        core.quit()
-    return response[0]
+    return ratings
     
 
 
-def run_pvt_break(win, stim, mouse, music, block_number, is_distraction_block):
-    if music is not None:
-        music.stop()  # breaks are always silent, even going into a distraction block
-
-
+def run_pvt_break(win, stim, mouse,block_number, is_distraction_block):
     break_clock = core.Clock()
     while break_clock.getTime() < PVT_BREAK_DURATION_SECONDS:
         remaining = max(0, int(PVT_BREAK_DURATION_SECONDS - break_clock.getTime()))
@@ -713,6 +705,78 @@ def run_pvt_break(win, stim, mouse, music, block_number, is_distraction_block):
     )
     wait_for_mouse_click(win, mouse, draw_each_frame=stim["break_text"])
 
+PVT_FINAL_QUESTIONNAIRE_ITEMS = [
+    "I was fantasizing or daydreaming",
+    "My thoughts drifted into situations unrelated to the task",
+    "I was distracted by environmental stimuli while in task",
+    "I found my attention drawn away by something I saw, heard, noticed around me",
+    "I was worried about my score on this test",
+    "I was wondering about the result for my test",
+    "I make my thoughts wonder so the task passes faster",
+    "I make my thoughts wonder so the task is less boring",
+    "I actively use the time in routine tasks to think about other things",
+    "I was surprised that, for a few seconds, your mind was thinking about something else",
+    "I had other thoughts randomly popping into my head during the task",
+    "I realized my mind wandered for a long time without intending them to",
+]
+
+def run_pvt_final_questionnaire(win, stim):
+    """Shown once at the end of the PVT task. Returns a list of
+    {"item": ..., "response": ...} dicts, one per statement."""
+    responses = []
+
+    intro = visual.TextStim(
+        win,
+        text=(
+            "Before you finish, please answer a few questions about your\n"
+            "thoughts during the task you just completed.\n\n"
+            "For each statement, rate how much it applied to you,\n"
+            "from 1 (Not at all) to 5 (Very much).\n\n"
+            "Press SPACEBAR to begin."
+        ),
+        height=0.06, wrapWidth=1.6, color="white",
+    )
+    intro.draw()
+    win.flip()
+    keys = event.waitKeys(keyList=["space", "escape"])
+    if "escape" in keys:
+        win.close()
+        core.quit()
+
+    for i, item_text in enumerate(PVT_FINAL_QUESTIONNAIRE_ITEMS):
+        prompt = (
+            f"({i + 1} of {len(PVT_FINAL_QUESTIONNAIRE_ITEMS)})\n\n"
+            f"\"{item_text}\"\n\n"
+            "1 = Not at all        5 = Very much\n\n"
+            "Press a number key (1-5)."
+        )
+        stim["probe_text"].text = prompt
+        stim["probe_text"].pos = (0, 0)
+        stim["probe_text"].draw()
+        win.flip()
+
+        response = event.waitKeys(keyList=["1", "2", "3", "4", "5", "escape"])
+        if "escape" in response:
+            win.close()
+            core.quit()
+
+        responses.append({"item": item_text, "response": response[0]})
+
+    return responses
+
+def save_pvt_final_questionnaire_to_excel(participant_id, responses):
+    participant_folder = get_participant_folder()
+    os.makedirs(participant_folder, exist_ok=True)
+    filename = os.path.join(participant_folder, f"{participant_id}_pvt_final_questionnaire.xlsx")
+
+    df = pd.DataFrame(responses)
+    df.index = range(1, len(df) + 1)
+    df.index.name = "Item Number"
+
+    with pd.ExcelWriter(filename, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name="final_questionnaire", index=True)
+
+    print(f"PVT final questionnaire saved to {filename}")
 
 def make_pvt_data_writer(participant_id):
     participant_folder = get_participant_folder()
@@ -722,7 +786,8 @@ def make_pvt_data_writer(participant_id):
     writer = csv.writer(csv_file)
     writer.writerow([
         "block_number", "distraction_condition", "trial_number", "wait_time_seconds",
-        "rt_seconds", "false_start_count", "trial_type", "thought_probe_response",
+        "rt_seconds", "false_start_count", "trial_type",
+        "probe_disengaged_rating", "probe_focused_rating", "probe_distracted_rating",
     ])
     csv_file.flush()
     return csv_file, writer
@@ -740,7 +805,6 @@ def run_pvt_task():
     block_order = get_pvt_block_order(session_value)
 
     stim = make_pvt_stimuli(win)
-    music = load_pvt_music()
     csv_file, writer = make_pvt_data_writer(participant_data["participant_id"])
 
     print("Starting PVT task...")
@@ -761,10 +825,7 @@ def run_pvt_task():
 
         for block_index in range(PVT_N_BLOCKS):
             is_distraction_block = block_order[block_index]
-            run_pvt_break(win, stim, mouse, music, block_index + 1, is_distraction_block)
-
-            if is_distraction_block and music is not None:
-                music.play()
+            run_pvt_break(win, stim, mouse, block_index + 1, is_distraction_block)
 
             probe_after_trials = set(
                 random.sample(range(PVT_N_TRIALS_PER_BLOCK), PVT_THOUGHT_PROBES_PER_BLOCK)
@@ -777,7 +838,7 @@ def run_pvt_task():
                     block_index + 1, is_distraction_block, trial_index + 1,
                     trial_data["wait_time"], trial_data["rt_seconds"],
                     trial_data["false_start_count"],
-                    "trial_skipped" if trial_data.get("skip") else "trial", "",
+                    "trial_skipped" if trial_data.get("skip") else "trial", "", "", "",
                 ])
 
             # --- advance progress bar on any button press: a genuine click OR a skip ---
@@ -795,16 +856,20 @@ def run_pvt_task():
                     break
 
                 if trial_index in probe_after_trials:
-                    probe_response = run_pvt_thought_probe(win, stim)
+                    probe_ratings = run_pvt_thought_probe(win, stim)
                     write_pvt_data_row(csv_file, writer, [
                         block_index + 1, is_distraction_block, trial_index + 1,
-                        "", "", "", "thought_probe", probe_response,
+                        "", "", "", "thought_probe",
+                        probe_ratings[PVT_THOUGHT_PROBE_OPTIONS[0]],
+                        probe_ratings[PVT_THOUGHT_PROBE_OPTIONS[1]],
+                        probe_ratings[PVT_THOUGHT_PROBE_OPTIONS[2]],
                     ])
 
-            if music is not None:
-                music.stop()
 
         stim["progress_bar"].autoDraw = False
+        questionnaire_responses = run_pvt_final_questionnaire(win, stim)
+        save_pvt_final_questionnaire_to_excel(participant_data["participant_id"], questionnaire_responses)
+        participant_data["pvt_final_questionnaire"] = questionnaire_responses
         goodbye = visual.TextStim(win, text="Thank you - this part of the study is complete.", height=0.07, color="white")
         goodbye.draw()
         win.flip()
@@ -814,8 +879,6 @@ def run_pvt_task():
         return "done"
 
     finally:
-        if music is not None:
-            music.stop()
         csv_file.close()
 
 
