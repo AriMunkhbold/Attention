@@ -531,8 +531,13 @@ def crossmodal_with_feedback(section_number=None, total_sections=None):
 
 PVT_N_PRACTICE_TRIALS = 3
 PVT_N_BLOCKS = 4
-PVT_N_TRIALS_PER_BLOCK = 34
+PVT_N_TRIALS_PER_BLOCK = 32
 PVT_THOUGHT_PROBES_PER_BLOCK = 3
+
+# Thought probes now appear right after trials 8, 16, and 24 in each block
+# (trial_index is 0-based, so "after trial 8" == trial_index 7, etc.)
+PVT_PROBE_AFTER_TRIAL_NUMBERS = [8, 16, 24]
+PVT_PROBE_AFTER_TRIAL_INDICES = [n - 1 for n in PVT_PROBE_AFTER_TRIAL_NUMBERS]
 
 PVT_FIXATION_DURATION = 2.0
 PVT_MIN_DELAY = 2.0
@@ -689,12 +694,6 @@ def run_pvt_break(win, stim, mouse, block_number):
             win.close()
             core.quit()
 
-    stim["break_text"].text = (
-        f"Block {block_number} of {PVT_N_BLOCKS}\n\n"
-        + "Click the mouse button when you are ready to continue."
-    )
-    wait_for_mouse_click(win, mouse, draw_each_frame=stim["break_text"])
-
 PVT_FINAL_QUESTIONNAIRE_ITEMS = [
     "I was fantasizing or daydreaming",
     "My thoughts drifted into situations unrelated to the task",
@@ -817,9 +816,7 @@ def run_pvt_task(section_number=None, total_sections=None):
             run_pvt_break(win, stim, mouse, block_index + 1)
             event.clearEvents()
 
-            probe_after_trials = set(
-                random.sample(range(PVT_N_TRIALS_PER_BLOCK), PVT_THOUGHT_PROBES_PER_BLOCK)
-            )
+            probe_after_trials = set(PVT_PROBE_AFTER_TRIAL_INDICES)  # fixed positions each block: after trials 8, 16, 24
 
             block_was_skipped = False
 
