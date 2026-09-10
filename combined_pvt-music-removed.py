@@ -601,12 +601,6 @@ def run_one_pvt_trial(win, stim, mouse, practice_delay):
     win.flip()
     core.wait(PVT_FIXATION_DURATION)
 
-    possible_delays = [
-        PVT_MIN_DELAY + i * PVT_DELAY_STEP
-        for i in range(int((PVT_MAX_DELAY - PVT_MIN_DELAY) / PVT_DELAY_STEP) + 1)
-    ]
-    wait_time = random.choice(possible_delays)
-
     stim["clock_hand"].ori = 0
     mouse.clickReset()
     false_start_count = 0
