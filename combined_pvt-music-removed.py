@@ -542,7 +542,9 @@ PVT_PROBE_AFTER_TRIAL_INDICES = [n - 1 for n in PVT_PROBE_AFTER_TRIAL_NUMBERS]
 PVT_FIXATION_DURATION = 2.0
 PVT_MIN_DELAY = 2.0
 PVT_MAX_DELAY = 10.0
-PVT_DELAY_STEP = 0.5
+
+PVT_DELAY_MEAN = (PVT_MIN_DELAY + PVT_MAX_DELAY) / 2.0
+PVT_DELAY_SD = 1.5 #confirm with team; largeer SD= closer to old uniform spread
 
 PVT_FEEDBACK_DURATION = 1.0
 PVT_BLANK_DURATION = 0.5
@@ -582,6 +584,17 @@ def make_pvt_stimuli(win):
         "progress_bar": progress_bar,    
     }
 
+def generate_block_delays(n_trials, mean=PVT_DELAY_MEAN, sd=PVT_DELAY_SD, low=PVT_MIN_DELAY, high=PVT_MAX_DELAY):
+    """Draw n_trials wait-times from a Gaussian centered on `mean`, re-sampling
+    any draw outside [low, high] so the block's delays stay bounded without
+    piling up at the edges. Call this once per block (or once for practice)
+    so every block gets its own independent set of delays."""
+    delays = np.random.normal(mean, sd, n_trials)
+    out_of_range = (delays < low) | (delays > high)
+    while np.any(out_of_range):
+        delays[out_of_range] = np.random.normal(mean, sd, int(np.sum(out_of_range)))
+        out_of_range = (delays < low) | (delays > high)
+    return delays.tolist()
 
 def run_one_pvt_trial(win, stim, mouse):
     stim["fixation"].draw()
@@ -807,8 +820,9 @@ def run_pvt_task(section_number=None, total_sections=None):
     try:
         wait_for_mouse_click(win, mouse, draw_each_frame=stim["instructions"])
 
-        for _ in range(PVT_N_PRACTICE_TRIALS):
-            run_one_pvt_trial(win, stim, mouse)
+        practice_delays = generate_block_delays(PVT_N_PRACTICE_TRIALS)
+        for practice_delay in practice_delays:
+            run_one_pvt_trial(win, stim, mouse, practice_delay)
 
         stim["progress_bar"].autoDraw = True
 
@@ -818,10 +832,13 @@ def run_pvt_task(section_number=None, total_sections=None):
 
             probe_after_trials = set(PVT_PROBE_AFTER_TRIAL_INDICES)  # fixed positions each block: after trials 8, 16, 24
 
+             # Fresh Gaussian draw for THIS block only -- not shared with other blocks
+            block_delays = generate_block_delays(PVT_N_TRIALS_PER_BLOCK)
+            
             block_was_skipped = False
 
             for trial_index in range(PVT_N_TRIALS_PER_BLOCK):
-                trial_data = run_one_pvt_trial(win, stim, mouse)
+                trial_data = run_one_pvt_trial(win, stim, mouse, block_delays[trial_index])
 
                 write_pvt_data_row(csv_file, writer, [
                     block_index + 1, trial_index + 1,
