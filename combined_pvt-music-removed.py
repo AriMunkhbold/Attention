@@ -596,7 +596,7 @@ def generate_block_delays(n_trials, mean=PVT_DELAY_MEAN, sd=PVT_DELAY_SD, low=PV
         out_of_range = (delays < low) | (delays > high)
     return delays.tolist()
 
-def run_one_pvt_trial(win, stim, mouse):
+def run_one_pvt_trial(win, stim, mouse, practice_delay):
     stim["fixation"].draw()
     win.flip()
     core.wait(PVT_FIXATION_DURATION)
