@@ -147,6 +147,31 @@ def wait_and_listen(duration, response_state, trial_clock, valid_keys=("1", "0")
                 response_state["reaction_time"] = round(trial_clock.getTime(), 3)
         core.wait(0.005)
 
+def wait_for_response_or_timeout(max_duration, response_state, trial_clock, draw_stims=None, valid_keys=("1", "0")):
+    """Like wait_and_listen, but returns as soon as a valid response is
+    recorded — used only for the post-stimulus response window, where
+    waiting any longer than necessary just delays feedback."""
+    draw_stims = draw_stims or []
+    clock = core.Clock()
+    while clock.getTime() < max_duration:
+        for s in draw_stims:
+            s.draw()
+        win.flip()
+
+        keys = event.getKeys(keyList=list(valid_keys) + ["escape", "s"])
+        if "escape" in keys:
+            win.close()
+            core.quit()
+        if "s" in keys:
+            response_state["skip"] = True
+            return
+        for k in keys:
+            if k in valid_keys and response_state["response"] is None:
+                response_state["response"] = k
+                response_state["reaction_time"] = round(trial_clock.getTime(), 3)
+                return   # <-- stop the instant we have a response
+        core.wait(0.005)
+
 
 # --- Save helpers ---
 
@@ -467,14 +492,14 @@ def crossmodal_with_feedback(section_number=None, total_sections=None):
             win.flip()
 
             if response_state["response"] is None:
-                wait_and_listen(4, response_state, trial_clock)
+                wait_for_response_or_timeout(4, response_state, trial_clock, draw_stims=[prompt_sound2])
                 if response_state["skip"]:
                     if trial_index < midpoint_index:
                         ask_confidence_question("midpoint")
                         trial_index = midpoint_index
                         continue
                     else:
-                        break
+                    break
 
             response = response_state["response"] if response_state["response"] is not None else "NA"
             reaction_time = response_state["reaction_time"] if response_state["reaction_time"] is not None else round(trial_clock.getTime(), 3)
